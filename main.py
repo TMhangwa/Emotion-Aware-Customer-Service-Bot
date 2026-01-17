@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
+import os
+import uvicorn
 
 load_dotenv()
 
@@ -36,3 +38,8 @@ async def chat(message: str):
         "reply": ai_response.content,
         "emotion_detected": label
     }
+if __name__ == "__main__":
+    # Railway provides the port via the PORT environment variable
+    port = int(os.environ.get("PORT", 8000))
+    # Use 0.0.0.0 to allow external traffic to reach the container
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
