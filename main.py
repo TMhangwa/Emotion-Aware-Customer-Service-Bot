@@ -1,43 +1,25 @@
 import os
-import requests
-from fastapi import FastAPI
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from dotenv import load_dotenv
-import os
 import uvicorn
-
-load_dotenv()
+import os
+from fastapi import FastAPI
+from huggingface_hub import InferenceClient
 
 app = FastAPI()
-llm = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Hugging Face Inference API for Emotion
-HF_API_URL = "https://api-inference.huggingface.co/models/j-hartmann/emotion-english-distilroberta-base"
-headers = {"Authorization": f"Bearer {os.getenv('HF_API_TOKEN')}"}
-
-
-def query_emotion(text):
-    response = requests.post(HF_API_URL, headers=headers, json={"inputs": text})
-    return response.json()[0][0]  # Returns {'label': 'anger', 'score': 0.9}
+# Connect to the Inference API (No local model download required!)
+client = InferenceClient(
+    model="j-hartmann/emotion-english-distilroberta-base",
+    token=os.getenv("HF_API_TOKEN")  # Add this in Railway Variables
+)
 
 
 @app.post("/chat")
 async def chat(message: str):
-    # 1. Get Emotion
-    emotion_data = query_emotion(message)
-    label = emotion_data['label']
+    # This call happens over the network, keeping your image tiny
+    results = client.text_classification(message)
+    top_emotion = results[0]['label']
 
-    # 2. Generate Empathetic Response
-    sys_msg = SystemMessage(content=f"The user is feeling {label}. Respond empathetically.")
-    user_msg = HumanMessage(content=message)
-
-    ai_response = llm.invoke([sys_msg, user_msg])
-
-    return {
-        "reply": ai_response.content,
-        "emotion_detected": label
-    }
+    return {"emotion": top_emotion, "reply": f"I detect you are feeling {top_emotion}."}
 if __name__ == "__main__":
     # Railway provides the port via the PORT environment variable
     port = int(os.environ.get("PORT", 8000))
